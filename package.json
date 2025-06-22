@@ -1,6 +1,6 @@
 {
   "name": "ts-kit",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "type": "commonjs",
   "main": "dist/index.ts",
   "description": "typescript kit",
