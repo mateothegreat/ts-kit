@@ -1,0 +1,35 @@
+{
+  "name": "ts-kit",
+  "version": "0.0.0",
+  "type": "commonjs",
+  "main": "dist/index.ts",
+  "description": "typescript kit",
+  "keywords": [
+    "typescript",
+    "kit",
+    "utilities",
+    "containers",
+    "hierarchical"
+  ],
+  "author": {
+    "name": "Matthew Davis",
+    "email": "matthew@matthewdavis.io"
+  },
+  "exports": {
+    ".": "./dist/index.ts"
+  },
+  "scripts": {
+    "build": "rm -rf dist && cp -r src dist && cp package.json dist",
+    "release": "npm version from-git && cp -r src dist && cp package.json dist",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "dev:sync": "npm run build && npm link"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

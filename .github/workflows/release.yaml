@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: "*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Ident
+        run: |
+          git config --global user.name 'Matthew Davis'
+          git config --global user.email 'matthew@matthewdavis.io'
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Bump package.json version
+        run: npm version from-git
+
+#      - name: Automatic GitHub Release
+#        uses: justincy/github-action-npm-release@2.0.1
+#        id: release
+
+      - name: npm install
+        run: npm install --force
+
+      - name: Build
+        run: |
+            npm run build
+            cp package.json dist/package.json
+
+      - name: Publish npm package
+        run: |
+            cd dist
+            npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
