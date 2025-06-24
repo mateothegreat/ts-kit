@@ -15,12 +15,15 @@ describe("HierarchicalContainer", () => {
 
   // Setup a fresh container before each test
   beforeEach(() => {
-    container = new HierarchicalContainer<MyData>({ name: "Root" });
+    container = new HierarchicalContainer<MyData>("root", { name: "Root" });
     rootContainer = container;
 
-    child1 = container.addChild({ name: "Child 1" });
-    child2 = container.addChild({ name: "Child 2", age: 30 });
-    nestedChild = child1.addChild({ name: "Nested Child", age: 10 });
+    child1 = container.addChild("child1", { name: "Child 1" });
+    child2 = container.addChild("child2", { name: "Child 2", age: 30 });
+    nestedChild = child1.addChild("nestedChild", {
+      name: "Nested Child",
+      age: 10,
+    });
   });
 
   it("should initialize with a root container", () => {
@@ -31,17 +34,17 @@ describe("HierarchicalContainer", () => {
   });
 
   it("should throw an error if value is null or undefined", () => {
-    expect(() => new HierarchicalContainer(null as any)).toThrow(
-      "Container must have a value."
-    );
-    expect(() => new HierarchicalContainer(undefined as any)).toThrow(
-      "Container must have a value."
-    );
+    expect(
+      () => new HierarchicalContainer(null as any, { name: "Root" })
+    ).toThrow("Container must have a value.");
+    expect(
+      () => new HierarchicalContainer(undefined as any, { name: "Root" })
+    ).toThrow("Container must have a value.");
   });
 
   describe("addChild method", () => {
     it("should add a child to the root container", () => {
-      const newChild = container.addChild({ name: "New Child" });
+      const newChild = container.addChild("newChild", { name: "New Child" });
       expect(newChild).not.toBeNull();
       expect(newChild.value).toEqual({ name: "New Child" });
       expect(newChild.parent?.id).toBe(container.id);
@@ -50,7 +53,9 @@ describe("HierarchicalContainer", () => {
     });
 
     it("should add a nested child to an existing container", () => {
-      const anotherNested = nestedChild.addChild({ name: "Another Nested" });
+      const anotherNested = nestedChild.addChild("anotherNested", {
+        name: "Another Nested",
+      });
       expect(anotherNested).not.toBeNull();
       expect(anotherNested.value).toEqual({ name: "Another Nested" });
       expect(anotherNested.parent?.id).toBe(nestedChild.id);
@@ -61,7 +66,7 @@ describe("HierarchicalContainer", () => {
 
   describe("add method (legacy)", () => {
     it("should add a child to the root container", () => {
-      const newChild = container.add(container.id, { name: "New Child" });
+      const newChild = container.add("newChild", { name: "New Child" });
       expect(newChild).not.toBeNull();
       expect(newChild?.value).toEqual({ name: "New Child" });
       expect(newChild?.parent?.id).toBe(container.id);
@@ -70,10 +75,11 @@ describe("HierarchicalContainer", () => {
     });
 
     it("should add a nested child to an existing container", () => {
-      const anotherNested = container.add(nestedChild.id, {
+      const anotherNested = container.add("anotherNested", {
         name: "Another Nested",
       });
       expect(anotherNested).not.toBeNull();
+      expect(anotherNested?.id).toBe("anotherNested");
       expect(anotherNested?.value).toEqual({ name: "Another Nested" });
       expect(anotherNested?.parent?.id).toBe(nestedChild.id);
       expect(nestedChild.children).toContain(anotherNested);
@@ -82,7 +88,7 @@ describe("HierarchicalContainer", () => {
 
     it("should return null if parentId is not found", () => {
       const nonExistentId = "non-existent-id";
-      const newChild = container.add(nonExistentId, { name: "Orphan" });
+      const newChild = container.add("newChild", { name: "Orphan" });
       expect(newChild).toBeNull();
     });
   });
@@ -181,13 +187,13 @@ describe("HierarchicalContainer", () => {
 
   describe("update method (legacy)", () => {
     it("should update the value of an existing container (full replacement for primitives)", () => {
-      container.update(child1.id, { name: "Updated Child 1" });
+      container.update("child1", { name: "Updated Child 1" });
       const updatedContainer = container.findById(child1.id);
       expect(updatedContainer?.value).toEqual({ name: "Updated Child 1" });
     });
 
     it("should update the value of an existing container (partial merge for objects)", () => {
-      container.update(child2.id, { age: 35 }); // child2 was { name: 'Child 2', age: 30 }
+      container.update("child2", { age: 35 }); // child2 was { name: 'Child 2', age: 30 }
       const updatedContainer = container.findById(child2.id);
       expect(updatedContainer?.value).toEqual({ name: "Child 2", age: 35 });
     });
@@ -324,8 +330,12 @@ describe("HierarchicalContainer", () => {
     it("should maintain ID uniqueness after clearing (global counter continues)", () => {
       // After clearing, the next generated ID should continue the global sequence
       container.clear();
-      const firstNewChild = container.addChild({ name: "First after clear" });
-      const secondNewChild = container.addChild({ name: "Second after clear" });
+      const firstNewChild = container.addChild("firstNewChild", {
+        name: "First after clear",
+      });
+      const secondNewChild = container.addChild("secondNewChild", {
+        name: "Second after clear",
+      });
 
       // IDs should continue from global counter, not reset to 1
       expect(parseInt(firstNewChild.id.split("-")[1])).toBeGreaterThan(4);

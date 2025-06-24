@@ -1,24 +1,17 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "module": "commonjs",
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": false,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": false,
-    "target": "es2017",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "incremental": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
     "strictNullChecks": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "inlineSourceMap": false
+    "target": "ES2022"
   },
-  "include": [
-    "./src/**/*",
-  ],
   "exclude": [
-    "./src/**/*.test*"
+    "**/*.spec.ts"
+  ],
+  "include": [
+    "./src/**/*"
   ]
 }

@@ -25,12 +25,13 @@ export class HierarchicalContainer<T> {
    * @param parent The parent container, if any.
    * @throws Error if the value is null or undefined.
    */
-  constructor(value: T, parent: HierarchicalContainer<T> | null = null) {
-    if (value === null || value === undefined) {
-      throw new Error("Container must have a value.");
-    }
-    this.id = this.generateUniqueId();
-    this.value = value;
+  constructor(
+    id?: string,
+    value?: T,
+    parent: HierarchicalContainer<T> | null = null
+  ) {
+    this.id = id || this.generateUniqueId();
+    this.value = value ?? ({} as T);
     this.parent = parent;
   }
 
@@ -62,8 +63,8 @@ export class HierarchicalContainer<T> {
    * @param newContainerValue The value for the new container.
    * @returns The newly created HierarchicalContainer<T> object.
    */
-  public addChild(newContainerValue: T): HierarchicalContainer<T> {
-    const newContainer = new HierarchicalContainer(newContainerValue, this);
+  public addChild(id: string, newContainerValue: T): HierarchicalContainer<T> {
+    const newContainer = new HierarchicalContainer(id, newContainerValue, this);
     this.children.push(newContainer);
     return newContainer;
   }
@@ -88,7 +89,7 @@ export class HierarchicalContainer<T> {
       return null;
     }
 
-    return parentContainer.addChild(newContainerValue);
+    return parentContainer.addChild(this.generateUniqueId(), newContainerValue);
   }
 
   /**
@@ -286,5 +287,238 @@ export class HierarchicalContainer<T> {
     this.children.length = 0;
     // Reset global ID counter if desired, or keep incrementing to ensure global uniqueness over time.
     // HierarchicalContainer.nextGlobalId = 1; // Uncomment if you want to reset global counter
+  }
+
+  /**
+   * Searches for a container using a dot-notation path string.
+   * Follows the StyleSet → Package → Variant hierarchy pattern.
+   *
+   * @param searchPath A dot-separated path string like "accordion.outline.md"
+   * @returns The matching container(s) or null if not found
+   */
+  public searchByPath(searchPath: string): HierarchicalContainer<T> | null {
+    if (!searchPath || searchPath.trim() === "") {
+      return null;
+    }
+
+    const pathSegments = searchPath.split(".");
+    let currentContainer: HierarchicalContainer<T> = this.getRoot();
+
+    // Navigate through each path segment
+    for (let i = 0; i < pathSegments.length; i++) {
+      const segment = pathSegments[i].trim();
+      if (!segment) continue;
+
+      // Search for a child container that matches this segment
+      const matchingChild = this.findMatchingChild(currentContainer, segment);
+
+      if (!matchingChild) {
+        console.warn(
+          `Path segment "${segment}" not found at level ${i} in path "${searchPath}"`
+        );
+        return null;
+      }
+
+      currentContainer = matchingChild;
+    }
+
+    return currentContainer;
+  }
+
+  /**
+   * Searches for all containers that match a dot-notation path string.
+   * Useful when multiple containers might match the same path pattern.
+   *
+   * @param searchPath A dot-separated path string like "*.outline.*" (supports wildcards)
+   * @returns An array of matching containers
+   */
+  public searchAllByPath(searchPath: string): HierarchicalContainer<T>[] {
+    if (!searchPath || searchPath.trim() === "") {
+      return [];
+    }
+
+    const pathSegments = searchPath.split(".");
+    const results: HierarchicalContainer<T>[] = [];
+
+    this.searchRecursive(this.getRoot(), pathSegments, 0, results);
+
+    return results;
+  }
+
+  /**
+   * Helper method to find a child container that matches a given segment.
+   * This method should be customized based on how you want to match segments
+   * against your container values (StyleSet, Package, Variant).
+   */
+  private findMatchingChild(
+    parent: HierarchicalContainer<T>,
+    segment: string
+  ): HierarchicalContainer<T> | null {
+    for (const child of parent.children) {
+      if (this.containerMatchesSegment(child, segment)) {
+        return child;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Determines if a container matches a path segment.
+   * Override this method to customize matching logic for your specific types.
+   *
+   * @param container The container to check
+   * @param segment The path segment to match against
+   * @returns True if the container matches the segment
+   */
+  private containerMatchesSegment(
+    container: HierarchicalContainer<T>,
+    segment: string
+  ): boolean {
+    // Default implementation - you should customize this based on your needs
+
+    // If the value is an object with a 'name' property, match against that
+    if (typeof container.value === "object" && container.value !== null) {
+      const valueObj = container.value as any;
+
+      // Check for common naming properties
+      if (valueObj.name === segment) return true;
+      if (valueObj.key === segment) return true;
+      if (valueObj.id === segment) return true;
+
+      // For StyleSet/Package/Variant pattern, you might want to check specific properties
+      // This is where you'd add custom logic for your hierarchy
+    }
+
+    // If the value is a string, match directly
+    if (typeof container.value === "string" && container.value === segment) {
+      return true;
+    }
+
+    // Fallback: convert value to string and compare
+    try {
+      const valueString = JSON.stringify(container.value);
+      if (valueString.includes(segment)) {
+        return true;
+      }
+    } catch {
+      // Ignore JSON serialization errors
+    }
+
+    return false;
+  }
+
+  /**
+   * Recursive helper for searchAllByPath with wildcard support.
+   */
+  private searchRecursive(
+    currentContainer: HierarchicalContainer<T>,
+    pathSegments: string[],
+    segmentIndex: number,
+    results: HierarchicalContainer<T>[]
+  ): void {
+    // If we've processed all segments, we found a match
+    if (segmentIndex >= pathSegments.length) {
+      results.push(currentContainer);
+      return;
+    }
+
+    const currentSegment = pathSegments[segmentIndex].trim();
+
+    // Handle wildcard segments
+    if (currentSegment === "*") {
+      // Wildcard matches any child, continue with all children
+      for (const child of currentContainer.children) {
+        this.searchRecursive(child, pathSegments, segmentIndex + 1, results);
+      }
+      return;
+    }
+
+    // Regular segment matching
+    for (const child of currentContainer.children) {
+      if (this.containerMatchesSegment(child, currentSegment)) {
+        this.searchRecursive(child, pathSegments, segmentIndex + 1, results);
+      }
+    }
+  }
+
+  /**
+   * Specialized search method for StyleSet → Package → Variant hierarchy.
+   * Assumes the container values follow this specific pattern.
+   *
+   * @param searchPath Path like "accordion.outline.md"
+   * @returns The matching variant container or null
+   */
+  public searchStyleSetPath(
+    searchPath: string
+  ): HierarchicalContainer<T> | null {
+    const pathSegments = searchPath.split(".");
+
+    if (pathSegments.length !== 3) {
+      console.warn(
+        "StyleSet search path must have exactly 3 segments: styleset.package.variant"
+      );
+      return null;
+    }
+
+    const [styleSetName, packageName, variantName] = pathSegments;
+
+    // Start from root and find the StyleSet
+    const root = this.getRoot();
+    const styleSetContainer = this.findChildByName(root, styleSetName);
+    if (!styleSetContainer) {
+      console.warn(`StyleSet "${styleSetName}" not found`);
+      return null;
+    }
+
+    // Find the Package within the StyleSet
+    const packageContainer = this.findChildByName(
+      styleSetContainer,
+      packageName
+    );
+    if (!packageContainer) {
+      console.warn(
+        `Package "${packageName}" not found in StyleSet "${styleSetName}"`
+      );
+      return null;
+    }
+
+    // Find the Variant within the Package
+    const variantContainer = this.findChildByName(
+      packageContainer,
+      variantName
+    );
+    if (!variantContainer) {
+      console.warn(
+        `Variant "${variantName}" not found in Package "${packageName}"`
+      );
+      return null;
+    }
+
+    return variantContainer;
+  }
+
+  /**
+   * Helper method to find a child by name property.
+   * Customize this based on how your objects store their names.
+   */
+  private findChildByName(
+    parent: HierarchicalContainer<T>,
+    name: string
+  ): HierarchicalContainer<T> | null {
+    for (const child of parent.children) {
+      // Customize this logic based on how your StyleSet/Package/Variant objects store names
+      const value = child.value as any;
+
+      // Check various possible name properties
+      if (
+        value?.name === name ||
+        value?.key === name ||
+        value?.id === name ||
+        value?.constructor?.name?.toLowerCase() === name.toLowerCase()
+      ) {
+        return child;
+      }
+    }
+    return null;
   }
 }

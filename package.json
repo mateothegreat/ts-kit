@@ -1,8 +1,7 @@
 {
-  "name": "ts-kit",
+  "name": "@mateothegreat/ts-kit",
   "version": "0.0.0",
-  "type": "commonjs",
-  "main": "dist/index.ts",
+  "type": "module",
   "description": "typescript kit",
   "keywords": [
     "typescript",
@@ -15,15 +14,12 @@
     "name": "Matthew Davis",
     "email": "matthew@matthewdavis.io"
   },
-  "exports": {
-    ".": "./dist/index.ts"
-  },
   "scripts": {
-    "build": "rm -rf dist && cp -r src dist && cp package.json dist",
-    "release": "npm version from-git && cp -r src dist && cp package.json dist",
+    "release": "npm version from-git",
     "test": "vitest run",
     "test:watch": "vitest --watch",
-    "dev:sync": "npm run build && npm link"
+    "dev:sync": "npm run build && npm link",
+    "dev:sync:watch": "find . -name '*.ts' | entr -c npm run dev:sync"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
