@@ -1,6 +1,6 @@
 {
   "name": "@mateothegreat/ts-kit",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "description": "typescript kit",
   "keywords": [
