@@ -2,6 +2,9 @@
   "name": "@mateothegreat/ts-kit",
   "version": "0.0.1",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "description": "typescript kit",
   "keywords": [
     "typescript",
@@ -15,7 +18,7 @@
     "email": "matthew@matthewdavis.io"
   },
   "scripts": {
-    "release": "npm version from-git",
+    "release": "npm version from-git && npm publish --access public",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "dev:sync": "npm run build && npm link",
