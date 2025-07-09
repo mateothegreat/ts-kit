@@ -1,10 +1,27 @@
 {
   "name": "@mateothegreat/ts-kit",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./containers": {
+      "types": "./dist/containers/index.d.ts",
+      "import": "./dist/containers/index.js"
+    },
+    "./fs": {
+      "types": "./dist/fs/index.d.ts",
+      "import": "./dist/fs/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "description": "typescript kit",
   "keywords": [
     "typescript",
@@ -18,6 +35,8 @@
     "email": "matthew@matthewdavis.io"
   },
   "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "release": "npm version from-git && npm publish --access public",
     "test": "vitest run",
     "test:watch": "vitest --watch",

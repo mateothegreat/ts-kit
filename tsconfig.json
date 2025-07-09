@@ -1,17 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "module": "esnext",
+    "module": "es2022",
     "moduleResolution": "bundler",
-    "noEmit": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "strict": true,
     "strictNullChecks": false,
-    "target": "ES2022"
+    "target": "es2022",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
-  "exclude": [
-    "**/*.spec.ts"
-  ],
-  "include": [
-    "./src/**/*"
-  ]
+  "exclude": ["**/*.spec.ts", "**/*.test.ts", "dist"],
+  "include": ["./src/**/*"]
 }
