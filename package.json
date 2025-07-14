@@ -17,10 +17,15 @@
     "./fs": {
       "types": "./dist/fs/index.d.ts",
       "import": "./dist/fs/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/index.d.ts",
+      "import": "./dist/http/index.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "description": "typescript kit",
   "keywords": [
