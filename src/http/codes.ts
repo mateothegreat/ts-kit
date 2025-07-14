@@ -6,8 +6,7 @@
  *
  * @example
  * ```ts
- * import { HTTP_STATUS_CODES } from './http/codes';
- *
+ * import { HTTP_STATUS_CODES } from './codes';
  * response.status(HTTP_STATUS_CODES.OK);
  * if (error.status === HTTP_STATUS_CODES.NOT_FOUND) {
  *   // handle not found
@@ -85,30 +84,59 @@ export enum HTTP_STATUS_CODES {
 }
 
 /**
- * A type that represents a supported HTTP status code.
+ * A type that represents a supported HTTP status code key.
  */
 export type HTTPStatusCode = keyof typeof HTTP_STATUS_CODES;
 
 /**
- * Maps a numeric HTTP status code to its corresponding HTTP status code enum value.
+ * Maps a numeric HTTP status code to its corresponding enum key using
+ * Object.keys() + runtime filtering + type narrowing to ensure type safety.
  *
  * @param status - The numeric HTTP status code to map.
  *
- * @returns The corresponding HTTP status code enum value.
+ * @returns The corresponding enum key (e.g. "NOT_FOUND").
+ *
+ * @throws If the status code is not recognized.
  *
  * @example
  * ```ts
- * import { getCodeByStatus } from './http/codes';
- *
  * console.log(getCodeByStatus(404)); // "NOT_FOUND"
  * ```
  */
 export const getCodeByStatus = (status: number): HTTPStatusCode => {
-  const code = Object.values(HTTP_STATUS_CODES).find((code) => code === status);
-  if (!code) {
-    throw new Error(
-      `could not map status code ${status} to a supported HTTP status code`
-    );
+  for (const key of Object.keys(HTTP_STATUS_CODES)) {
+    // Skip reverse numeric keys
+    if (!isNaN(Number(key))) continue;
+
+    const code = key as HTTPStatusCode;
+    if (HTTP_STATUS_CODES[code] === status) {
+      return code;
+    }
   }
-  return code;
+
+  throw new Error(
+    `Could not map status code ${status} to a supported HTTP status code`
+  );
+};
+
+/**
+ * Maps an enum key (e.g. "NOT_FOUND") to its numeric HTTP status code.
+ *
+ * @param code - The enum key to look up.
+ *
+ * @returns The numeric HTTP status code.
+ *
+ * @throws If the code is not valid.
+ *
+ * @example
+ * ```ts
+ * console.log(getStatusByCode("NOT_FOUND")); // 404
+ * ```
+ */
+export const getStatusByCode = (code: HTTPStatusCode): number => {
+  const status = HTTP_STATUS_CODES[code];
+  if (typeof status !== "number") {
+    throw new Error(`Invalid HTTP status code key: "${code}"`);
+  }
+  return status;
 };
