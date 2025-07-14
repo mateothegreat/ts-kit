@@ -7,12 +7,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "./dist/*": {
-      "types": "./src/*.ts",
-      "import": "./src/*.ts"
+      "types": "./dist/*.ts",
+      "import": "./dist/*.ts"
     },
     "./*": {
-      "types": "./dist/*.d.ts",
-      "import": "./dist/*.js"
+      "types": "./src/*.d.ts",
+      "import": "./src/*.js"
     }
   },
   "files": [
