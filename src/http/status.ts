@@ -92,6 +92,11 @@ export const getHTTPStatusClassification = (
 };
 
 /**
+ * A type that represents a record of HTTP status code buckets.
+ */
+export type HTTPStatusBucketsType = Record<HTTPStatusCategory, number>;
+
+/**
  * A class that represents a collection of HTTP status code buckets.
  *
  * @example
@@ -101,13 +106,13 @@ export const getHTTPStatusClassification = (
  * ```
  */
 export class HTTPStatusBuckets {
-  readonly #buckets: Record<HTTPStatusCategory, number>;
+  readonly #buckets: HTTPStatusBucketsType;
 
   constructor() {
     this.#buckets = HTTP_STATUS_RANGES.reduce((acc, range) => {
       acc[range.category] = 0;
       return acc;
-    }, {} as Record<HTTPStatusCategory, number>);
+    }, {} as HTTPStatusBucketsType);
   }
 
   /**
