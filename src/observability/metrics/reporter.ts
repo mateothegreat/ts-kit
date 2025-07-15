@@ -1,7 +1,8 @@
 import { BehaviorSubject, Observable } from "rxjs";
 import { distinctUntilChanged } from "rxjs/operators";
 import { shallowEqual } from "../../objects/shallow-equal";
-import { add, Operation, sub } from "./operations";
+import type { Operation } from "./operations";
+import { add, sub } from "./operations";
 
 /**
  * A value that can be stored in the reporter's state.

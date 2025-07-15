@@ -1,4 +1,4 @@
-import { ReporterStateMap, ReporterValue } from "./reporter";
+import type { ReporterStateMap, ReporterValue } from "./reporter";
 
 /**
  * A function that, given the current state, returns a partial delta.

@@ -1,8 +1,8 @@
-import { Mode } from "node:fs";
+import type { Mode } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ensure } from "./ensure";
-import { FileWriteResult } from "./types";
+import type { FileWriteResult } from "./types";
 
 export const read = async (
   path: string,
