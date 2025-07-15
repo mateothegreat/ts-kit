@@ -51,12 +51,6 @@ describe("Reporter", () => {
     );
   });
 
-  it("should throw when sub() on undefined", () => {
-    expect(() => reporter.sub("missing", 5)).toThrow(
-      /key missing is not a number/
-    );
-  });
-
   it("should handle null, undefined, and object values", () => {
     reporter.apply({
       flag: null,
@@ -107,6 +101,12 @@ describe("Reporter", () => {
     reporter.set("latency", NaN); // NaN !== NaN → should emit
 
     expect(spy).toHaveLength(1);
+  });
+
+  it("should handle non-existent keys", () => {
+    reporter.add("x", 1);
+    reporter.set("y", 2);
+    expect(reporter.snapshot()).toEqual({ x: 1, y: 2 });
   });
 
   it("should apply builder pattern correctly", () => {

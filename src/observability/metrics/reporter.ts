@@ -164,6 +164,10 @@ export class Reporter {
    * @returns {Reporter} The reporter instance for builder pattern usage.
    */
   add(key: string, value: number): Reporter {
+    if (!this.#state[key]) {
+      this.set(key, value);
+      return this;
+    }
     if (typeof this.#state[key] === "number") {
       const next = (this.#state[key] ?? 0) + value;
       this.apply({ [key]: next });
@@ -185,6 +189,10 @@ export class Reporter {
    * @returns {Reporter} The reporter instance for builder pattern usage.
    */
   sub(key: string, value: number): Reporter {
+    if (!this.#state[key]) {
+      this.set(key, value);
+      return this;
+    }
     if (typeof this.#state[key] === "number") {
       const next = (this.#state[key] ?? 0) - value;
       this.apply({ [key]: next });
