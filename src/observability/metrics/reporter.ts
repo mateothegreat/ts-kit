@@ -1,6 +1,6 @@
-import { shallowEqual } from "@mateothegreat/ts-kit/objects/equality";
 import { BehaviorSubject, Observable } from "rxjs";
 import { distinctUntilChanged, map } from "rxjs/operators";
+import { shallowEqual } from "../../objects/equality";
 
 export type MetricsValue =
   | string
