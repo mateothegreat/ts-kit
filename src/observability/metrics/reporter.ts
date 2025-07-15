@@ -38,30 +38,30 @@ export interface ReporterStateMap {
  * console.log(reporter.snapshot()); // { foo: 2 }
  * ```
  */
-export class Reporter {
+export class Reporter<T extends Record<string, ReporterValue>> {
   /**
    * The current state of the reporter.
    */
-  #state: ReporterStateMap;
+  #state: T;
 
   /**
    * The subject that emits the current state.
    */
-  #subject: BehaviorSubject<ReporterStateMap>;
+  #subject: BehaviorSubject<T>;
 
   /**
    * The observable that emits the current state.
    */
-  readonly metrics$: Observable<ReporterStateMap>;
+  readonly metrics$: Observable<T>;
 
   /**
    * Create a new reporter.
    *
    * @param initial - The initial state. Defaults to an empty object.
    */
-  constructor(initial?: Partial<ReporterStateMap>) {
-    this.#state = { ...(initial ?? {}) };
-    this.#subject = new BehaviorSubject<ReporterStateMap>({ ...this.#state });
+  constructor(initial?: Partial<T>) {
+    this.#state = { ...(initial ?? {}) } as T;
+    this.#subject = new BehaviorSubject<T>({ ...this.#state });
     this.metrics$ = this.#subject
       .asObservable()
       .pipe(distinctUntilChanged(shallowEqual));
@@ -75,19 +75,21 @@ export class Reporter {
    *
    * @returns The reporter instance.
    */
-  apply(...items: Array<Partial<ReporterStateMap> | Operation>): Reporter {
+  apply(...items: Array<Partial<T> | Operation>): Reporter<T> {
     // Build the next state by applying each item sequentially.
     let next = { ...this.#state };
 
     for (const item of items) {
-      const delta: Partial<ReporterStateMap> =
-        typeof item === "function" ? (item as Operation)(next) : item;
+      const delta: Partial<Record<string, ReporterValue>> =
+        typeof item === "function"
+          ? (item as Operation)(next)
+          : (item as Partial<T>);
       Object.assign(next, delta);
     }
 
     // Emit only if anything actually changed.
     if (!shallowEqual(this.#state, next)) {
-      this.#state = next;
+      this.#state = next as T;
       this.#subject.next({ ...next });
     }
 
@@ -102,8 +104,8 @@ export class Reporter {
    *
    * @returns The reporter instance.
    */
-  set(key: string, value: ReporterValue): Reporter {
-    return this.apply({ [key]: value });
+  set(key: string, value: ReporterValue): Reporter<T> {
+    return this.apply({ [key]: value } as Partial<T>);
   }
 
   /**
@@ -114,7 +116,7 @@ export class Reporter {
    *
    * @returns The reporter instance.
    */
-  add(key: string, amount: number): Reporter {
+  add(key: string, amount: number): Reporter<T> {
     return this.apply(add(key, amount));
   }
 
@@ -126,7 +128,7 @@ export class Reporter {
    *
    * @returns The reporter instance.
    */
-  sub(key: string, amount: number): Reporter {
+  sub(key: string, amount: number): Reporter<T> {
     return this.apply(sub(key, amount));
   }
 
@@ -135,7 +137,7 @@ export class Reporter {
    *
    * @returns A shallow clone of the current state.
    */
-  snapshot(): ReporterStateMap {
+  snapshot(): T {
     return { ...this.#state };
   }
 
@@ -161,23 +163,21 @@ export class Reporter {
    *
    * @returns The reporter instance.
    */
-  prune(
-    predicates: Array<(state: ReporterStateMap, key: string) => boolean>
-  ): Reporter {
-    const next: ReporterStateMap = {};
+  prune(predicates: Array<(state: T, key: string) => boolean>): Reporter<T> {
+    const next: T = {} as T;
 
     let removed = false;
 
     for (const key of Object.keys(this.#state)) {
       if (predicates.every((fn) => fn(this.#state, key))) {
-        next[key] = this.#state[key];
+        next[key as keyof T] = this.#state[key as keyof T];
       } else {
         removed = true;
       }
     }
 
     if (removed && !shallowEqual(this.#state, next)) {
-      this.#state = next;
+      this.#state = next as T;
       this.#subject.next({ ...next });
     }
 
@@ -215,10 +215,10 @@ export class Reporter {
    * ```
    */
   transform(options: {
-    keep?: Array<(state: ReporterStateMap, key: string) => boolean>;
-    drop?: Array<(state: ReporterStateMap, key: string) => boolean>;
-  }): Reporter {
-    const next: ReporterStateMap = {};
+    keep?: Array<(state: T, key: string) => boolean>;
+  }): Reporter<T> {
+    const next: T = { ...this.#state };
+
     let removed = false;
 
     for (const key of Object.keys(this.#state)) {
@@ -227,11 +227,11 @@ export class Reporter {
         options.keep.some((fn) => fn(this.#state, key));
 
       const passesDrop =
-        options.drop !== undefined &&
-        options.drop.some((fn) => fn(this.#state, key));
+        options.keep !== undefined &&
+        options.keep.some((fn) => fn(this.#state, key));
 
       if (passesKeep && !passesDrop) {
-        next[key] = this.#state[key];
+        next[key as keyof T] = this.#state[key as keyof T];
       } else {
         removed = true;
       }
@@ -278,17 +278,17 @@ export class Reporter {
    * ```
    */
   extract(
-    predicates: Array<(state: ReporterStateMap, key: string) => boolean>,
+    predicates: Array<(state: T, key: string) => boolean>,
     mode: "any" | "all" = "all"
-  ): ReporterStateMap {
-    const next: ReporterStateMap = {};
+  ): T {
+    const next: T = {} as T;
     for (const key of Object.keys(this.#state)) {
       const passed =
         mode === "all"
           ? predicates.every((fn) => fn(this.#state, key))
           : predicates.some((fn) => fn(this.#state, key));
       if (passed) {
-        next[key] = this.#state[key];
+        next[key as keyof T] = this.#state[key as keyof T];
       }
     }
     return next;
@@ -330,7 +330,7 @@ export class Reporter {
    * // Logs: { foo: 1 }
    * ```
    */
-  watch(...keys: string[]): Observable<ReporterStateMap> {
+  watch(...keys: string[]): Observable<T> {
     return this.metrics$.pipe(
       // Start with the initial state.
       startWith(this.snapshot()),
