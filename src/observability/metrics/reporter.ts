@@ -65,7 +65,12 @@ export class MetricsReporter {
     return changes;
   }
 
-  capture(delta: Partial<MetricsStateMap>): MetricsStateMap | null {
+  set(key: string, value: MetricsValue): MetricsReporter {
+    this.apply({ [key]: value });
+    return this;
+  }
+
+  apply(delta: Partial<MetricsStateMap>): MetricsReporter {
     const next = { ...this.#state };
     let changed = false;
 
@@ -81,25 +86,25 @@ export class MetricsReporter {
       this.#subject.next({ ...next });
     }
 
-    return changed ? next : null;
+    return this;
   }
 
-  add(key: string, value: number): number {
+  add(key: string, value: number): MetricsReporter {
     if (typeof this.#state[key] === "number") {
       const next = (this.#state[key] ?? 0) + value;
-      this.capture({ [key]: next });
-      return next;
+      this.apply({ [key]: next });
+      return this;
     }
     throw new TypeError(
       `key ${key} is not a number, is ${typeof this.#state[key]}`
     );
   }
 
-  sub(key: string, value: number): number {
+  sub(key: string, value: number): MetricsReporter {
     if (typeof this.#state[key] === "number") {
       const next = (this.#state[key] ?? 0) - value;
-      this.capture({ [key]: next });
-      return next;
+      this.apply({ [key]: next });
+      return this;
     }
     throw new TypeError(
       `key ${key} is not a number, is ${typeof this.#state[key]}`
