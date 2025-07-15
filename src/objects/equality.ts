@@ -1,42 +1,4 @@
 /**
- * Performs a strict shallow equality check between two plain objects.
- *
- * Comparison rules:
- * - Keys must match exactly (no extra or missing properties)
- * - Values are compared with `Object.is()` for type and value
- * - Prototype chain and non-enumerable properties are ignored
- *
- * @template T - Object type to compare.
- *
- * @param a - First object.
- * @param b - Second object.
- *
- * @returns `true` if all shallow key-value pairs are equal, else `false`.
- *
- * @example
- * ```ts
- * shallowEqual({ a: 1 }, { a: 1 }) // true
- * shallowEqual({ a: 1 }, { a: "1" }) // false
- * shallowEqual({ a: 1 }, { a: 1, b: 2 }) // false
- * ```
- */
-export const shallowEqual = <T extends object>(a: T, b: T): boolean => {
-  if (a === b) return true;
-
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-
-  if (keysA.length !== keysB.length) return false;
-
-  for (const key of keysA) {
-    if (!Object.hasOwn(b, key)) return false;
-    if (!Object.is(a[key as keyof T], b[key as keyof T])) return false;
-  }
-
-  return true;
-};
-
-/**
  * Performs a deep structural equality check between two values.
  *
  * Handles:

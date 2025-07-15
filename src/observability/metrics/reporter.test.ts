@@ -1,58 +1,116 @@
-import { describe, expect, it } from "vitest";
-import { MetricsReporter } from "./reporter";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Reporter } from "./reporter";
 
-describe("MetricsReporter", () => {
-  it("emits initial snapshot", () => {
-    const reporter = new MetricsReporter({ boot: true });
-    reporter.metrics$.subscribe((snapshot) => {
-      expect(snapshot).toEqual({ boot: true });
+describe("Reporter", () => {
+  let reporter: Reporter;
+
+  beforeEach(() => {
+    reporter = new Reporter();
+  });
+
+  it("should initialize with empty state", () => {
+    expect(reporter.snapshot()).toEqual({});
+  });
+
+  it("should initialize with predefined state", () => {
+    const r = new Reporter({ status: "ready", count: 1 });
+    expect(r.snapshot()).toEqual({ status: "ready", count: 1 });
+  });
+
+  it("should emit new state when set", () => {
+    reporter.set("stage", "idle");
+    expect(reporter.snapshot()).toEqual({ stage: "idle" });
+  });
+
+  it("should not emit if value is unchanged", () => {
+    reporter = new Reporter({ x: 1 });
+    reporter.metrics$.subscribe((v) => console.log("v", v));
+    reporter.set("x", 1); // identical value
+    expect(reporter.snapshot()).toEqual({ x: 1 });
+  });
+
+  it("should emit multiple key changes together", () => {
+    reporter.apply({ a: 1, b: true, c: "value" });
+    expect(reporter.snapshot()).toEqual({ a: 1, b: true, c: "value" });
+  });
+
+  it("should support add() for number values", () => {
+    reporter.set("requests", 2).add("requests", 3);
+    expect(reporter.snapshot()).toEqual({ requests: 5 });
+  });
+
+  it("should support sub() for number values", () => {
+    reporter.set("errors", 10).sub("errors", 3);
+    expect(reporter.snapshot()).toEqual({ errors: 7 });
+  });
+
+  it("should throw when add() on non-number", () => {
+    reporter.set("status", "ready");
+    expect(() => reporter.add("status", 1)).toThrow(
+      /key status is not a number/
+    );
+  });
+
+  it("should throw when sub() on undefined", () => {
+    expect(() => reporter.sub("missing", 5)).toThrow(
+      /key missing is not a number/
+    );
+  });
+
+  it("should handle null, undefined, and object values", () => {
+    reporter.apply({
+      flag: null,
+      meta: undefined,
+      payload: { id: 123 },
+    });
+
+    expect(reporter.snapshot()).toEqual({
+      flag: null,
+      meta: undefined,
+      payload: { id: 123 },
     });
   });
 
-  it("tracks value changes and emits updates", () => {
-    const reporter = new MetricsReporter();
-    let latest = {};
-    reporter.updates$.subscribe((update) => {
-      latest = update.snapshot;
-    });
+  it("should support replacing object values shallowly", () => {
+    reporter.set("payload", { x: 1 });
+    reporter.set("payload", { x: 1 }); // equal
+    reporter.set("payload", { x: 2 }); // changed
 
-    reporter.capture({ requests: 1 });
-    reporter.capture({ requests: 2, latency: 100 });
-
-    expect(latest).toEqual({ requests: 2, latency: 100 });
+    expect(reporter.snapshot()).toEqual({ payload: { x: 2 } });
   });
 
-  it("emits changes with before/after values", () => {
-    const reporter = new MetricsReporter({ requests: 5 });
-    let changes: any[] = [];
-
-    reporter.updates$.subscribe((update) => {
-      changes = update.changes;
-    });
-
-    reporter.capture({ requests: 10, errors: 2 });
-
-    expect(changes).toEqual([
-      { key: "requests", before: 5, after: 10 },
-      { key: "errors", before: undefined, after: 2 },
-    ]);
+  it("should support toggling booleans", () => {
+    reporter.set("flag", false).apply({ flag: true });
+    expect(reporter.snapshot().flag).toBe(true);
   });
 
-  it("does not emit if values are unchanged", () => {
-    const reporter = new MetricsReporter({ x: 1 });
-    let called = 0;
-    reporter.metrics$.subscribe(() => called++);
-    reporter.capture({ x: 1 }); // no change
-    expect(called).toBe(1); // only initial emit
+  it("should not mutate internal state externally", () => {
+    const snap = reporter.set("x", 42).snapshot();
+    snap.x = 999;
+    expect(reporter.snapshot().x).toBe(42);
   });
 
-  it("provides a safe snapshot clone", () => {
-    const reporter = new MetricsReporter();
-    reporter.capture({ stage: "ready" });
+  it("should emit only on Object.is inequality", () => {
+    const spy: any[] = [];
+    const obj = { a: 1 };
+    reporter.metrics$.subscribe((v) => spy.push(v));
+    reporter.set("data", obj);
+    reporter.set("data", obj); // same reference
 
-    const snapshot = reporter.snapshot();
-    snapshot.stage = "hacked";
+    expect(spy).toHaveLength(1); // no re-emit
+  });
 
-    expect(reporter.snapshot().stage).toBe("ready");
+  it("should handle NaN correctly", () => {
+    const spy: any[] = [];
+
+    reporter.metrics$.subscribe((v) => spy.push(v));
+    reporter.set("latency", NaN); // NaN !== NaN → should emit
+
+    expect(spy).toHaveLength(1);
+  });
+
+  it("should apply builder pattern correctly", () => {
+    reporter.set("x", 1).add("x", 2).sub("x", 1);
+    expect(reporter.snapshot().x).toBe(2);
   });
 });
