@@ -1,8 +1,13 @@
 import { BehaviorSubject, Observable } from "rxjs";
-import { distinctUntilChanged } from "rxjs/operators";
+import {
+  distinctUntilChanged,
+  filter,
+  map,
+  pairwise,
+  startWith,
+} from "rxjs/operators";
 import { shallowEqual } from "../../objects/shallow-equal";
-import type { Operation } from "./operations";
-import { add, sub } from "./operations";
+import { add, sub, type Operation } from "./operations";
 
 /**
  * A value that can be stored in the reporter's state.
@@ -132,5 +137,209 @@ export class Reporter {
    */
   snapshot(): ReporterStateMap {
     return { ...this.#state };
+  }
+
+  /**
+   * Prunes the reporter's state by one or more predicates.
+   *
+   * Notes:
+   * - Pruning is destructive and idempotent unless a key is actually removed.
+   * - Keeps only keys for which *all* predicates return `true`.
+   *
+   * @param predicates - The predicates to filter by.
+   *
+   * @example
+   * ```ts
+   * const reporter = new Reporter();
+   * reporter.apply(set("foo", 1), set("bar", 2), set("baz", 3));
+   * reporter.prune([
+   *   (state, key) => key !== "foo",
+   *   (state, key) => key !== "bar",
+   * ]);
+   * console.log(reporter.snapshot()); // { baz: 3 }
+   * ```
+   *
+   * @returns The reporter instance.
+   */
+  prune(
+    predicates: Array<(state: ReporterStateMap, key: string) => boolean>
+  ): Reporter {
+    const next: ReporterStateMap = {};
+
+    let removed = false;
+
+    for (const key of Object.keys(this.#state)) {
+      if (predicates.every((fn) => fn(this.#state, key))) {
+        next[key] = this.#state[key];
+      } else {
+        removed = true;
+      }
+    }
+
+    if (removed && !shallowEqual(this.#state, next)) {
+      this.#state = next;
+      this.#subject.next({ ...next });
+    }
+
+    return this;
+  }
+
+  /**
+   * Transforms the reporter's current state using keep and/or drop logic.
+   *
+   * This is a destructive operation that mutates internal state and emits
+   * only if keys are removed. Unlike `filter()` or `sample()`, this method
+   * gives you explicit control over which keys to retain or exclude.
+   *
+   * You may pass either:
+   * - `keep`: an array of predicates where at least one must return true
+   * - `drop`: an array of predicates where if any return true, the key is removed
+   *
+   * A key is kept if:
+   *  1. It matches at least one `keep` predicate (if provided)
+   *  2. AND it does not match any `drop` predicate
+   *
+   * This allows compound logic for conditional observability pruning.
+   *
+   * @param options - An object containing `keep` and/or `drop` predicate arrays.
+   *
+   * @returns The reporter instance.
+   *
+   * @example
+   * ```ts
+   * reporter.transform({
+   *   keep: [(s, k) => typeof s[k] === "number"],
+   *   drop: [(s, k) => k.startsWith("temp_"), (s, k) => k === "debug"]
+   * });
+   * // Keeps only numeric keys not starting with temp_ or labeled debug.
+   * ```
+   */
+  transform(options: {
+    keep?: Array<(state: ReporterStateMap, key: string) => boolean>;
+    drop?: Array<(state: ReporterStateMap, key: string) => boolean>;
+  }): Reporter {
+    const next: ReporterStateMap = {};
+    let removed = false;
+
+    for (const key of Object.keys(this.#state)) {
+      const passesKeep =
+        options.keep === undefined ||
+        options.keep.some((fn) => fn(this.#state, key));
+
+      const passesDrop =
+        options.drop !== undefined &&
+        options.drop.some((fn) => fn(this.#state, key));
+
+      if (passesKeep && !passesDrop) {
+        next[key] = this.#state[key];
+      } else {
+        removed = true;
+      }
+    }
+
+    if (removed && !shallowEqual(this.#state, next)) {
+      this.#state = next;
+      this.#subject.next({ ...next });
+    }
+
+    return this;
+  }
+
+  /**
+   * Extracts a subset of the reporter's current state based on logical predicate filtering.
+   *
+   * This method creates a shallow clone of the internal state and filters its keys using one
+   * or more predicate functions. It is purely read-only and does not mutate or emit updates.
+   *
+   * The filtering mode determines how predicates are applied:
+   *
+   * 1. `"any"` - A key is included if **at least one predicate** returns `true`.
+   * 2. `"all"` - A key is included only if **every predicate** returns `true`.
+   *
+   * This approach is useful for sampling the state map non-destructively for analysis,
+   * logging, or conditional metrics logic, without triggering downstream emissions.
+   *
+   * @param predicates - An array of predicate functions that evaluate keys in the state.
+   * @param mode - Logical filtering mode (`"any"` or `"all"`). Defaults to `"all"`.
+   *
+   * @returns A filtered `ReporterStateMap` object containing only matching keys.
+   *
+   * @example
+   * ```ts
+   * const reporter = new Reporter();
+   * reporter.apply(set("foo", 1), set("bar", "ok"), set("baz", true));
+   *
+   * const subset = reporter.extract([
+   *   (state, key) => typeof state[key] === "string",
+   *   (state, key) => key === "baz"
+   * ], "any");
+   *
+   * console.log(subset); // { bar: "ok", baz: true }
+   * ```
+   */
+  extract(
+    predicates: Array<(state: ReporterStateMap, key: string) => boolean>,
+    mode: "any" | "all" = "all"
+  ): ReporterStateMap {
+    const next: ReporterStateMap = {};
+    for (const key of Object.keys(this.#state)) {
+      const passed =
+        mode === "all"
+          ? predicates.every((fn) => fn(this.#state, key))
+          : predicates.some((fn) => fn(this.#state, key));
+      if (passed) {
+        next[key] = this.#state[key];
+      }
+    }
+    return next;
+  }
+
+  /**
+   * Allows you to subscribe to changes to specific keys in the reporter's state.
+   *
+   * This pipe creates a filtered stream that only emits when watched keys change by:
+   *
+   * 1. `startWith(this.snapshot())` - Ensures the stream begins with the current
+   *    state, providing immediate access to initial values for subscribers.
+   *
+   * 2. `pairwise()` - Buffers emissions into pairs of [previous, current] state,
+   *    enabling comparison between consecutive states to detect changes.
+   *
+   * 3. `filter([prev, curr] => ...)` - Only allows emissions through when at least
+   *    one of the watched keys has actually changed, using Object.is() for precise
+   *    equality comparison (handles NaN, -0/+0 correctly).
+   *
+   * 4. `map([, curr] => curr)` - Extracts just the current state from the pair,
+   *    providing subscribers with the updated state object.
+   *
+   * This approach prevents unnecessary emissions when unwatched keys change,
+   * optimizing performance for components that only care about specific metrics.
+   *
+   * @param keys - One or more keys to watch for changes explicitly.
+   *
+   * @returns An observable that emits the reporter's state when the specified
+   * keys change.
+   *
+   * @example
+   * ```ts
+   * const reporter = new Reporter();
+   * reporter.watch("foo").subscribe((state) => {
+   *   console.log(state.foo);
+   * });
+   * reporter.apply(set("foo", 1), set("bar", 2));
+   * // Logs: { foo: 1 }
+   * ```
+   */
+  watch(...keys: string[]): Observable<ReporterStateMap> {
+    return this.metrics$.pipe(
+      // Start with the initial state.
+      startWith(this.snapshot()),
+      // Pair each emission with the previous [previous, current] values.
+      pairwise(),
+      // Only pass through when at least one watched key changed.
+      filter(([prev, curr]) => keys.some((k) => !Object.is(prev[k], curr[k]))),
+      // Map to the new state.
+      map(([, curr]) => curr)
+    );
   }
 }

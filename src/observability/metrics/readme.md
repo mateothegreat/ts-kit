@@ -10,6 +10,13 @@ where you need to observe changes over time.
 
 It combines the flexibility of function-based commands with the simplicity of direct delta patches.
 
+### Methods
+
+- `filter()` — logical AND (default: all predicates must pass).
+- `prune()` — logical AND, but destructive (mutates state and emits).
+- `extract(..., "any" | "all")` — read-only sampling with logical mode (default: all predicates must pass).
+- `watch(...keys)` — filtered stream that only emits when watched keys change (default: all keys).
+
 ### Operation Functions
 
 `set`, `add`, `sub`, `compute`, `when` each return a pure function that derives a partial delta from the existing state.
