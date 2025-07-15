@@ -1,9 +1,10 @@
-import { Observable, Subject } from "rxjs";
+import { BehaviorSubject, Observable } from "rxjs";
 import { distinctUntilChanged } from "rxjs/operators";
 import { shallowEqual } from "../../objects/shallow-equal";
+import { add, Operation, sub } from "./operations";
 
 /**
- * Supported value types for the reporter state map.
+ * A value that can be stored in the reporter's state.
  */
 export type ReporterValue =
   | string
@@ -14,200 +15,119 @@ export type ReporterValue =
   | object;
 
 /**
- * A map of key-value pairs that represent the state of the reporter.
+ * A map of keys to values that can be stored in the reporter's state.
  */
 export interface ReporterStateMap {
   [key: string]: ReporterValue;
 }
 
 /**
- * A change in the state of the reporter.
- */
-export interface ReporterChange {
-  key: string;
-  before: ReporterValue;
-  after: ReporterValue;
-}
-
-/**
- * An update to the state of the reporter.
- */
-export interface ReporterUpdate {
-  changes: ReporterChange[];
-  snapshot: ReporterStateMap;
-}
-
-/**
- * A reporter is a class that maintains a state map and emits the latest
- * reconciled value of the state map.
+ * A reporter for managing metrics and observability data or buckets of data
+ * where you need to observe changes over time.
  *
  * @example
  * ```ts
  * const reporter = new Reporter();
- * reporter.set("count", 0);
- * reporter.snapshot(); // { count: 0 }
- * reporter.metrics$.subscribe((state) => console.log(state)); // { count: 0 }
- * reporter.add("count", 1);
- * reporter.sub("count", 1);
- * reporter.snapshot(); // { count: 1 }
- * // You could also subscribe to the observables earlier and get emissions like:
- * reporter.metrics$.subscribe((state) => console.log(state)); // { count: 1 }
- * reporter.updates$.subscribe((update) => console.log(update)); // { changes: [{ key: "count", before: 0, after: 1 }], snapshot: { count: 1 } }
+ * reporter.apply(set("foo", 1), add("foo", 2), sub("foo", 1));
+ * console.log(reporter.snapshot()); // { foo: 2 }
  * ```
  */
 export class Reporter {
   /**
-   * Emits the latest reconciled value of the state map.
-   */
-  readonly #subject: Subject<ReporterStateMap>;
-
-  /**
-   * Emits the new state to subscribers when (and if) the state changes.
-   */
-  readonly metrics$: Observable<ReporterStateMap>;
-
-  /**
-   * Emits the new state to subscribers when (and if) the state changes.
-   */
-  // readonly updates$: Observable<ReporterUpdate>;
-
-  /**
-   * Holds the values for the state that we maintain.
+   * The current state of the reporter.
    */
   #state: ReporterStateMap;
 
   /**
-   * Creates a new reporter instance.
+   * The subject that emits the current state.
+   */
+  #subject: BehaviorSubject<ReporterStateMap>;
+
+  /**
+   * The observable that emits the current state.
+   */
+  readonly metrics$: Observable<ReporterStateMap>;
+
+  /**
+   * Create a new reporter.
    *
-   * @param {Partial<ReporterStateMap>} initial - The initial state. @optional
+   * @param initial - The initial state. Defaults to an empty object.
    */
   constructor(initial?: Partial<ReporterStateMap>) {
     this.#state = { ...(initial ?? {}) };
-    this.#subject = new Subject<ReporterStateMap>();
-
+    this.#subject = new BehaviorSubject<ReporterStateMap>({ ...this.#state });
     this.metrics$ = this.#subject
       .asObservable()
       .pipe(distinctUntilChanged(shallowEqual));
   }
 
   /**
-   * Returns the changes between the previous and next state.
+   * Apply a mix of raw deltas and Operations in one atomic batch.
+   * Each Operation sees the **evolving** state from previous ops.
    *
-   * @param {ReporterStateMap} next - The next state.
+   * @param items - The items to apply.
    *
-   * @returns {ReporterChange[]} The changes between the previous and next state.
+   * @returns The reporter instance.
    */
-  #change(next: ReporterStateMap): ReporterChange[] {
-    const changes: ReporterChange[] = [];
-    const prev = this.#state;
+  apply(...items: Array<Partial<ReporterStateMap> | Operation>): Reporter {
+    // Build the next state by applying each item sequentially.
+    let next = { ...this.#state };
 
-    for (const key of Object.keys(next)) {
-      if (!Object.is(prev[key], next[key])) {
-        changes.push({
-          key,
-          before: prev[key],
-          after: next[key],
-        });
-      }
+    for (const item of items) {
+      const delta: Partial<ReporterStateMap> =
+        typeof item === "function" ? (item as Operation)(next) : item;
+      Object.assign(next, delta);
     }
 
-    return changes;
+    // Emit only if anything actually changed.
+    if (!shallowEqual(this.#state, next)) {
+      this.#state = next;
+      this.#subject.next({ ...next });
+    }
+
+    return this;
   }
 
   /**
-   * Sets a value for a key in the state.
+   * Helper method for setting a key to a value from an operation.
    *
-   * @param {string} key - The key to set.
-   * @param {ReporterValue} value - The value to set.
+   * @param key - The key to set.
+   * @param value - The value to set.
    *
-   * @returns {Reporter} The reporter instance for builder pattern usage.
+   * @returns The reporter instance.
    */
   set(key: string, value: ReporterValue): Reporter {
-    this.apply({ [key]: value });
-    return this;
+    return this.apply({ [key]: value });
   }
 
   /**
-   * Applies a delta to the state.
+   * Helper method for adding a number to a key from an operation.
    *
-   * @param {Partial<ReporterStateMap>} delta - The delta to apply to the state.
+   * @param key - The key to add to.
+   * @param amount - The amount to add.
    *
-   * @returns {Reporter} The reporter instance for builder pattern usage.
+   * @returns The reporter instance.
    */
-  apply(delta: Partial<ReporterStateMap>): Reporter {
-    const current = { ...this.#state };
-    let changed = false;
-
-    for (const key in delta) {
-      if (!Object.is(delta[key], this.#state[key])) {
-        current[key] = delta[key];
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      this.#state = current;
-      this.#subject.next({ ...current });
-    }
-
-    return this;
+  add(key: string, amount: number): Reporter {
+    return this.apply(add(key, amount));
   }
 
   /**
-   * Adds a value to a key in the state.
+   * Helper method for subtracting a number from a key from an operation.
    *
-   * @throws {TypeError} - Throws an error if the `key` is not of type `number`.
+   * @param key - The key to subtract from.
+   * @param amount - The amount to subtract.
    *
-   * @param {string} key - The key to add to.
-   * @param {number} value - The value to add.
-   *
-   * @returns {Reporter} The reporter instance for builder pattern usage.
+   * @returns The reporter instance.
    */
-  add(key: string, value: number): Reporter {
-    if (!this.#state[key]) {
-      this.set(key, value);
-      return this;
-    }
-    if (typeof this.#state[key] === "number") {
-      const next = (this.#state[key] ?? 0) + value;
-      this.apply({ [key]: next });
-      return this;
-    }
-    throw new TypeError(
-      `key ${key} is not a number, is ${typeof this.#state[key]}`
-    );
+  sub(key: string, amount: number): Reporter {
+    return this.apply(sub(key, amount));
   }
 
   /**
-   * Subtracts a value from a key in the state.
+   * Helper method for getting a snapshot of the current state.
    *
-   * @throws {TypeError} - Throws an error if the `key` is not of type `number`.
-   *
-   * @param {string} key - The key to subtract from.
-   * @param {number} value - The value to subtract.
-   *
-   * @returns {Reporter} The reporter instance for builder pattern usage.
-   */
-  sub(key: string, value: number): Reporter {
-    if (!this.#state[key]) {
-      this.set(key, value);
-      return this;
-    }
-    if (typeof this.#state[key] === "number") {
-      const next = (this.#state[key] ?? 0) - value;
-      this.apply({ [key]: next });
-      return this;
-    }
-    throw new TypeError(
-      `key ${key} is not a number, is ${typeof this.#state[key]}`
-    );
-  }
-
-  /**
-   * Returns a snapshot of the state by cloning the current state
-   * to prevent mutation.
-   *
-   * @returns {ReporterStateMap} Copy of the state map.
+   * @returns A shallow clone of the current state.
    */
   snapshot(): ReporterStateMap {
     return { ...this.#state };
