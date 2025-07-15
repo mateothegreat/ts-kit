@@ -39,6 +39,7 @@ export class MetricsReporter {
     this.metrics$ = this.#subject
       .asObservable()
       .pipe(distinctUntilChanged(shallowEqual));
+
     this.updates$ = this.metrics$.pipe(
       map((snapshot) => ({
         changes: this.#getChanges(snapshot),
