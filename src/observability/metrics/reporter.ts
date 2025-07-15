@@ -42,13 +42,13 @@ export class MetricsReporter {
 
     this.updates$ = this.metrics$.pipe(
       map((snapshot) => ({
-        changes: this.#getChanges(snapshot),
+        changes: this.#change(snapshot),
         snapshot,
       }))
     );
   }
 
-  #getChanges(next: MetricsStateMap): MetricsChange[] {
+  #change(next: MetricsStateMap): MetricsChange[] {
     const changes: MetricsChange[] = [];
     const prev = this.#state;
 
@@ -65,7 +65,7 @@ export class MetricsReporter {
     return changes;
   }
 
-  capture(delta: Partial<MetricsStateMap>): void {
+  capture(delta: Partial<MetricsStateMap>): MetricsStateMap | null {
     const next = { ...this.#state };
     let changed = false;
 
@@ -80,6 +80,30 @@ export class MetricsReporter {
       this.#state = next;
       this.#subject.next({ ...next });
     }
+
+    return changed ? next : null;
+  }
+
+  add(key: string, value: number): number {
+    if (typeof this.#state[key] === "number") {
+      const next = (this.#state[key] ?? 0) + value;
+      this.capture({ [key]: next });
+      return next;
+    }
+    throw new TypeError(
+      `key ${key} is not a number, is ${typeof this.#state[key]}`
+    );
+  }
+
+  sub(key: string, value: number): number {
+    if (typeof this.#state[key] === "number") {
+      const next = (this.#state[key] ?? 0) - value;
+      this.capture({ [key]: next });
+      return next;
+    }
+    throw new TypeError(
+      `key ${key} is not a number, is ${typeof this.#state[key]}`
+    );
   }
 
   snapshot(): MetricsStateMap {
