@@ -1,21 +1,31 @@
+/**
+ * @see https://www.typescriptlang.org/tsconfig
+ */
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "module": "es2022",
-    "moduleResolution": "bundler",
-    "noEmit": false,
     "declaration": true,
     "declarationMap": true,
+    "emitDecoratorMetadata": false,
+    "esModuleInterop": true,
+    "experimentalDecorators": false,
+    "forceConsistentCasingInFileNames": true,
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "strictNullChecks": false,
     "target": "es2022",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    /**
+     * makes TypeScript truly enforce the definition provided as an optional property.
+
+     * @see https://www.typescriptlang.org/tsconfig/#exactOptionalPropertyTypes
+     */
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": false
   },
   "exclude": ["**/*.spec.ts", "**/*.test.ts", "dist"],
-  "include": ["./src/**/*"]
+  "include": ["./src/**/*.ts"]
 }

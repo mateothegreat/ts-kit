@@ -7,8 +7,10 @@
  * - Prototype chain and non-enumerable properties are ignored
  *
  * @template T - Object type to compare.
+ *
  * @param a - First object.
  * @param b - Second object.
+ *
  * @returns `true` if all shallow key-value pairs are equal, else `false`.
  *
  * @example
@@ -45,7 +47,15 @@ export const shallowEqual = <T extends object>(a: T, b: T): boolean => {
  *
  * @param a - First value to compare.
  * @param b - Second value to compare.
+ *
  * @returns `true` if the values are deeply equal, else `false`.
+ *
+ * @example
+ * ```ts
+ * deepEqual({ a: { b: [1, 2] }, c: new Date('2024-01-01') }, { a: { b: [1, 2] }, c: new Date('2024-01-01') }) // true
+ * deepEqual({ a: new Map([['x', 1]]) }, { a: new Map([['x', '1']]) }) // false
+ * deepEqual({ users: [{ id: 1, tags: new Set(['admin']) }] }, { users: [{ id: 1, tags: new Set(['user']) }] }) // false
+ * ```
  */
 export const deepEqual = (a: any, b: any): boolean => {
   if (a === b) return true;
