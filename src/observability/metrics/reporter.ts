@@ -59,8 +59,8 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    *
    * @param initial - The initial state. Defaults to an empty object.
    */
-  constructor(initial?: Partial<T>) {
-    this.#state = { ...(initial ?? {}) } as T;
+  constructor(initial?: T) {
+    this.#state = initial ?? ({} as T);
     this.#subject = new BehaviorSubject<T>({ ...this.#state });
     this.metrics$ = this.#subject
       .asObservable()
