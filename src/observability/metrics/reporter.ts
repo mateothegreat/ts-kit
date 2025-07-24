@@ -1,4 +1,4 @@
-import { BehaviorSubject, Observable } from "rxjs";
+import { Observable, Subject } from "rxjs";
 import {
   distinctUntilChanged,
   filter,
@@ -7,7 +7,7 @@ import {
   startWith,
 } from "rxjs/operators";
 import { shallowEqual } from "../../objects/shallow-equal";
-import { add, sub, type Operation } from "./operations";
+import { type Operation } from "./operations";
 
 /**
  * A value that can be stored in the reporter's state.
@@ -38,7 +38,9 @@ export interface ReporterStateMap {
  * console.log(reporter.snapshot()); // { foo: 2 }
  * ```
  */
-export class Reporter<T extends Record<string, ReporterValue>> {
+export class Reporter<
+  T extends Record<string, ReporterValue> = ReporterStateMap
+> {
   /**
    * The current state of the reporter.
    */
@@ -47,7 +49,7 @@ export class Reporter<T extends Record<string, ReporterValue>> {
   /**
    * The subject that emits the current state.
    */
-  #subject: BehaviorSubject<T>;
+  #subject: Subject<T>;
 
   /**
    * The observable that emits the current state.
@@ -61,7 +63,7 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    */
   constructor(initial?: T) {
     this.#state = initial ?? ({} as T);
-    this.#subject = new BehaviorSubject<T>({ ...this.#state });
+    this.#subject = new Subject<T>();
     this.metrics$ = this.#subject
       .asObservable()
       .pipe(distinctUntilChanged(shallowEqual));
@@ -75,24 +77,16 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    *
    * @returns The reporter instance.
    */
-  apply(...items: Array<Partial<T> | Operation>): Reporter<T> {
-    // Build the next state by applying each item sequentially.
+  apply(...items: Array<Partial<T> | Operation<T>>): Reporter<T> {
     let next = { ...this.#state };
-
     for (const item of items) {
-      const delta: Partial<Record<string, ReporterValue>> =
-        typeof item === "function"
-          ? (item as Operation)(next)
-          : (item as Partial<T>);
+      const delta = typeof item === "function" ? item(next) : item;
       Object.assign(next, delta);
     }
-
-    // Emit only if anything actually changed.
     if (!shallowEqual(this.#state, next)) {
-      this.#state = next as T;
+      this.#state = next;
       this.#subject.next({ ...next });
     }
-
     return this;
   }
 
@@ -104,9 +98,13 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    *
    * @returns The reporter instance.
    */
-  set(key: string, value: ReporterValue): Reporter<T> {
-    return this.apply({ [key]: value } as Partial<T>);
-  }
+  set =
+    <T extends Record<string, ReporterValue>>(
+      key: keyof T,
+      value: T[typeof key]
+    ): Operation<T> =>
+    () =>
+      ({ [key]: value } as Partial<T>);
 
   /**
    * Helper method for adding a number to a key from an operation.
@@ -116,9 +114,15 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    *
    * @returns The reporter instance.
    */
-  add(key: string, amount: number): Reporter<T> {
-    return this.apply(add(key, amount));
-  }
+  add =
+    <T extends Record<string, ReporterValue>>(
+      key: keyof T,
+      amount: number
+    ): Operation<T> =>
+    (state) => {
+      const cur = typeof state[key] === "number" ? (state[key] as number) : 0;
+      return { [key]: cur + amount } as Partial<T>;
+    };
 
   /**
    * Helper method for subtracting a number from a key from an operation.
@@ -128,9 +132,15 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    *
    * @returns The reporter instance.
    */
-  sub(key: string, amount: number): Reporter<T> {
-    return this.apply(sub(key, amount));
-  }
+  sub =
+    <T extends Record<string, ReporterValue>>(
+      key: keyof T,
+      amount: number
+    ): Operation<T> =>
+    (state) => {
+      const cur = typeof state[key] === "number" ? (state[key] as number) : 0;
+      return { [key]: cur - amount } as Partial<T>;
+    };
 
   /**
    * Helper method for getting a snapshot of the current state.
@@ -330,15 +340,11 @@ export class Reporter<T extends Record<string, ReporterValue>> {
    * // Logs: { foo: 1 }
    * ```
    */
-  watch(...keys: string[]): Observable<T> {
+  watch(...keys: (keyof T)[]): Observable<T> {
     return this.metrics$.pipe(
-      // Start with the initial state.
       startWith(this.snapshot()),
-      // Pair each emission with the previous [previous, current] values.
       pairwise(),
-      // Only pass through when at least one watched key changed.
       filter(([prev, curr]) => keys.some((k) => !Object.is(prev[k], curr[k]))),
-      // Map to the new state.
       map(([, curr]) => curr)
     );
   }

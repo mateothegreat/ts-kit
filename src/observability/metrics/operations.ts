@@ -1,11 +1,11 @@
-import type { ReporterValue } from "./reporter";
+import type { ReporterStateMap, ReporterValue } from "./reporter";
 
 /**
  * A function that, given the current state, returns a partial delta.
  */
-export type Operation = (
-  state: Readonly<Record<string, ReporterValue>>
-) => Partial<Record<string, ReporterValue>>;
+export type Operation<
+  T extends Record<string, ReporterValue> = ReporterStateMap
+> = (state: Readonly<T>) => Partial<T>;
 
 /**
  * Set a key to a value.

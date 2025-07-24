@@ -27,6 +27,6 @@
     "exactOptionalPropertyTypes": true,
     "useUnknownInCatchVariables": false
   },
-  "exclude": ["**/*.spec.ts", "**/*.test.ts", "dist"],
+  "exclude": ["**/*.test.ts"],
   "include": ["./src/**/*.ts"]
 }
